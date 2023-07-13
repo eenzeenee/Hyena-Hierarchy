@@ -35,11 +35,14 @@ class Hyena(nn.Module):
 
     def forward(self, x):
         x = x.float()  # Convert input tensor to float
-        x = self.linear1(x)
-        x = x.view(x.size(0), -1, self.depth).transpose(1, 2)
-        x = self.conv1d(x)
-        x = x.transpose(1, 2).contiguous().view(-1, self.depth * self.positional_dim)
-        x = self.linear2(x)
+        ## Algorithm 1 Projection
+        x = self.linear1(x) ## input_dim, depth -> input_dim,(output_dim+1)depth
+        x = x.view(x.size(0), -1, self.depth).transpose(1, 2) ## input_dim,(output_dim+1)depth -> input_dim, depth, (output_dim+1) ~ split z into x^1 ~ x^N
+        ## Algorithm 2 Hyena Filter
+        x = self.conv1d(x) ## input_dim, positional_dim (= feature map size), depth
+        x = x.transpose(1, 2).contiguous().view(-1, self.depth * self.positional_dim) ## input_dim, positional_dim, depth -> input_dim, depth, positional_dim -> input, depth * positional_dim
+                ### why use contiguous() -> view() 메소드 사용 시 메모리 저장 상태 변경되어 RuntimeError 발생 -> contiguous = True 변경 위해 해당 메소드 활용 (차원 변경 없음)
+        x = self.linear2(x) ## input, depth * positional_dim -> depth * positional_dim, output_dim
         return x
 
 def train_hyena_model(text_file, input_dim, filter_size, depth, positional_dim, lr, num_epochs, batch_size=128):
@@ -106,7 +109,7 @@ def main():
     output_dim = 64
     filter_size = 3
     depth = 3
-    positional_dim = (input_dim - filter_size + 2 * (filter_size // 2)) // 1 + 1
+    positional_dim = (input_dim - filter_size + 2 * (filter_size // 2)) // 1 + 1 ## feature map size formula
     lr = 0.001
     num_epochs = 1000
 
